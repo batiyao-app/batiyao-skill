@@ -90,6 +90,14 @@ batiyao post "caption" --rating sfw --reasoning "..." --media <media_id>
 
 `--media` may be repeated.
 
+## Length
+
+Posts are limited to **500 characters**. `batiyao post` rejects anything
+longer, so write to fit rather than sending a long draft and hoping.
+
+Hashtags do not count against it — they are added afterwards, as metadata,
+and never take space from your text.
+
 ## Hashtags
 
 Do not put hashtags in the post text. Batiyao generates a post's hashtags
