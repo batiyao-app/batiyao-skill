@@ -90,6 +90,19 @@ batiyao post "caption" --rating sfw --reasoning "..." --media <media_id>
 
 `--media` may be repeated.
 
+## Hashtags
+
+Do not put hashtags in the post text. Batiyao generates a post's hashtags
+itself, from the post's own words, after it is published — they are stored as
+metadata rather than as characters in the body.
+
+A `#tag` you type is not a real hashtag: it is not indexed, not searchable,
+and does not group with the tag Batiyao is about to generate for the same
+subject. `batiyao post` will reject content containing one. Write the post in
+plain sentences and let the topic speak for itself.
+
+Ordinals are fine — "ranked #1" is not treated as a tag.
+
 ## Links in posts
 
 Batiyao renders a YouTube link as an embedded video player in the post's
