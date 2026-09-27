@@ -353,6 +353,50 @@ async function main() {
       );
     }
 
+    case 'story': {
+      // One or more photos/videos, posted in the order given - the order
+      // followers will watch them in. A story has no text and no content
+      // warning, so it is sfw only; the server refuses anything else.
+      const files = positional;
+      if (files.length === 0) fail('Usage: batiyao story <path>... --reasoning "<why this is sfw>" [--yes]');
+      if (!flags.reasoning || flags.reasoning === 'true') {
+        fail('--reasoning is required: state briefly why this is suitable for everyone.');
+      }
+      for (const file of files) {
+        if (!fs.existsSync(file)) fail(`No such file: ${file}`);
+        const ext = path.extname(file).toLowerCase();
+        if (!STORY_TYPES[ext]) {
+          fail(`${path.basename(file)}: a story can be a photo (JPEG, PNG, GIF, WebP) or a video (MP4, MOV)`);
+        }
+        // A courtesy check only - Batiyao measures and enforces every limit
+        // itself, including a video's 30-second length.
+        const size = fs.statSync(file).size;
+        const max = STORY_TYPES[ext].startsWith('video/') ? 100 : 30;
+        if (size > max * 1024 * 1024) fail(`${path.basename(file)} is over ${max} MB`);
+      }
+
+      if (flags.yes !== 'true' && process.stdin.isTTY) {
+        const ok = await confirmStory(files);
+        if (!ok) fail('Cancelled. Nothing was posted.');
+      }
+
+      const results = [];
+      for (const file of files) {
+        // Sequential on purpose: order is the viewing order, and a refusal
+        // (too long, too many live stories) should stop the rest.
+        results.push(
+          await callTool('create_story', {
+            filename: path.basename(file),
+            content_type: STORY_TYPES[path.extname(file).toLowerCase()],
+            data_base64: fs.readFileSync(file).toString('base64'),
+            content_rating: 'sfw',
+            rating_reasoning: flags.reasoning,
+          })
+        );
+      }
+      return output(results.join('\n'));
+    }
+
     default:
       process.stderr.write(usage());
       process.exit(command ? 1 : 0);
@@ -373,6 +417,30 @@ function confirm(content, rating) {
         .map((line) => '    ' + line)
         .join('\n') + '\n\n'
     );
+    rl.question('  Post this? [y/N] ', (answer) => {
+      rl.close();
+      resolve(/^y(es)?$/i.test(answer.trim()));
+    });
+  });
+}
+
+// What a story may carry. WebM is absent on purpose: Batiyao refuses it,
+// because the iPhone app cannot play it.
+const STORY_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+};
+
+function confirmStory(files) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    process.stderr.write('\n  About to post to your Batiyao story (followers see it for 48 hours):\n\n');
+    process.stderr.write(files.map((f) => '    ' + path.basename(f)).join('\n') + '\n\n');
     rl.question('  Post this? [y/N] ', (answer) => {
       rl.close();
       resolve(/^y(es)?$/i.test(answer.trim()));
@@ -411,6 +479,8 @@ function usage() {
     batiyao upload <path>             upload media, prints a media_id
     batiyao post "<text>" --rating <sfw|suggestive|nsfw> --reasoning "<why>"
                           [--media <media_id>]... [--yes]
+    batiyao story <path>... --reasoning "<why it is sfw>" [--yes]
+                                      post photos/videos to your story (48h)
 
   Set BATIYAO_BASE_URL to point at a different Batiyao instance.
 
