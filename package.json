@@ -1,6 +1,6 @@
 {
   "name": "@batiyao/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Command-line access to a Batiyao account via Batiyao Bridge (OAuth 2.1 + MCP).",
   "bin": {
     "batiyao": "bin/batiyao.js"

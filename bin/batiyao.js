@@ -34,6 +34,10 @@ const DEFAULT_SCOPES = [
   'read:chat',
   'write:post',
   'write:media',
+  // Both spend BuckBuck, and the consent screen says so; the person may
+  // untick them there.
+  'write:rating',
+  'write:review',
 ];
 
 // --- credential storage -----------------------------------------------
@@ -297,6 +301,44 @@ async function main() {
       return output(await callTool('get_post', { post_id: id }));
     }
 
+    case 'review-status': {
+      const id = positional[0];
+      if (!id) fail('Usage: batiyao review-status <post_id>');
+      return output(await callTool('get_post_review_status', { post_id: id }));
+    }
+
+    case 'rate': {
+      const [id, rating] = positional;
+      if (!id || !RATINGS.includes(rating)) {
+        fail('Usage: batiyao rate <post_id> <' + RATINGS.join('|') + '> [--yes]');
+      }
+      // 0.1 BuckBuck to the author the first time; changing it is free.
+      if (flags.yes !== 'true' && process.stdin.isTTY) {
+        const ok = await confirmSpend(`Rate post ${id} as "${rating}" (0.1 BuckBuck to the author the first time)?`);
+        if (!ok) fail('Cancelled. Nothing was rated.');
+      }
+      return output(await callTool('rate_post', { post_id: id, rating }));
+    }
+
+    case 'review': {
+      const [id, vote] = positional;
+      if (!id || !['verified', 'disputed'].includes(vote)) {
+        fail('Usage: batiyao review <post_id> <verified|disputed> --reason "<10-1000 characters>" [--yes]');
+      }
+      const reason = flags.reason;
+      if (!reason || reason === 'true' || [...reason].length < 10 || [...reason].length > 1000) {
+        fail('--reason is required: 10 to 1000 characters on why the post is ' + vote + '.');
+      }
+      // A stake that can be lost: the person must see it before it goes.
+      if (flags.yes !== 'true' && process.stdin.isTTY) {
+        const ok = await confirmSpend(
+          `Fact-check post ${id} as "${vote}"? This stakes 2 BuckBuck for 7 days and is lost if most reviewers vote the other way.\n    Reason: ${reason}`
+        );
+        if (!ok) fail('Cancelled. Nothing was staked.');
+      }
+      return output(await callTool('review_post', { post_id: id, vote, reason }));
+    }
+
     case 'notifications':
       return output(await callTool('get_notifications', {}));
 
@@ -403,6 +445,19 @@ async function main() {
   }
 }
 
+const RATINGS = ['far_left', 'left', 'center_left', 'center', 'center_right', 'right', 'far_right'];
+
+function confirmSpend(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    process.stderr.write(`\n  ${question}\n\n`);
+    rl.question('  Go ahead? [y/N] ', (answer) => {
+      rl.close();
+      resolve(/^y(es)?$/i.test(answer.trim()));
+    });
+  });
+}
+
 function output(text) {
   process.stdout.write(text.endsWith('\n') ? text : text + '\n');
 }
@@ -481,6 +536,12 @@ function usage() {
                           [--media <media_id>]... [--yes]
     batiyao story <path>... --reasoning "<why it is sfw>" [--yes]
                                       post photos/videos to your story (48h)
+
+    batiyao review-status <post_id>   a post's fact-check and your rating
+    batiyao rate <post_id> <far_left|left|center_left|center|center_right|right|far_right> [--yes]
+                                      0.1 BuckBuck to the author, the first time
+    batiyao review <post_id> <verified|disputed> --reason "<why>" [--yes]
+                                      fact-check: stakes 2 BuckBuck for 7 days
 
   Set BATIYAO_BASE_URL to point at a different Batiyao instance.
 
