@@ -58,6 +58,10 @@ show the user the exact text you intend to post and get their confirmation
 before running the command.** Never post speculatively or as a side effect
 of another task.
 
+Posts don't last forever: each account keeps them for 1, 2 or 3 years, as its
+owner chooses in Settings, 1 year by default. A post past that date answers as
+not found.
+
 ```bash
 batiyao post "text of the post" --rating sfw --reasoning "why this rating"
 ```
